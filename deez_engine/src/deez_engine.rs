@@ -266,16 +266,16 @@ impl DeezEngineRelayerHandler {
                                             if !should_forward_tx(&cloned_tx_cache, &tx_signature) {
                                                 continue;
                                             }
-                                            // let meta_bytes = match bincode::serialize(&packet.meta()) {
-                                            //     Ok(data) => data,
-                                            //     Err(_) => continue,
-                                            // };
-                                            // tx_data.reserve(meta_bytes.len());
-                                            // tx_data.splice(0..0, meta_bytes.clone());
+                                            let meta_bytes = match bincode::serialize(&packet.meta()) {
+                                                Ok(data) => data,
+                                                Err(_) => continue,
+                                            };
+                                            tx_data.reserve(meta_bytes.len());
+                                            tx_data.splice(0..0, meta_bytes.clone());
 
-                                            // let length_bytes = (tx_data.len() as u16).to_le_bytes().to_vec();
-                                            // tx_data.reserve(2);
-                                            // tx_data.splice(0..0, length_bytes);
+                                            let length_bytes = (tx_data.len() as u16).to_le_bytes().to_vec();
+                                            tx_data.reserve(2);
+                                            tx_data.splice(0..0, length_bytes);
 
                                             info!("forwarding data ");
                                             info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx_data);
