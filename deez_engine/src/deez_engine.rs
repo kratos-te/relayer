@@ -1,19 +1,27 @@
+use crate::heartbeat_sender::OnChainHeartbeatSender;
+use dashmap::DashSet;
+use jito_block_engine::block_engine::BlockEnginePackets;
+use jito_core::tx_cache::should_forward_tx;
+use log::*;
+use solana_sdk::transaction::VersionedTransaction;
 use std::{
     io,
     sync::Arc,
     thread::{Builder, JoinHandle},
     time::{Duration, Instant},
 };
-use dashmap::DashSet;
-use jito_block_engine::block_engine::BlockEnginePackets;
-use jito_core::tx_cache::should_forward_tx;
-use log::*;
-use solana_sdk::transaction::VersionedTransaction;
 use thiserror::Error;
-use tokio::{io::AsyncWriteExt, net::TcpStream, runtime::Runtime, select, sync::{broadcast::Receiver, mpsc, Mutex}, task, time::{interval, sleep, timeout}};
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use crate::heartbeat_sender::OnChainHeartbeatSender;
+use tokio::{
+    io::AsyncWriteExt,
+    net::TcpStream,
+    runtime::Runtime,
+    select,
+    sync::{broadcast::Receiver, mpsc, Mutex},
+    task,
+    time::{interval, sleep, timeout},
+};
 
 const HEARTBEAT_LEN: u16 = 4;
 const PONG_MESSAGE: &[u8; 4] = b"pong";
@@ -54,17 +62,12 @@ const V3_MSG_WITH_LENGTH: &[u8; 4] = &[
     V3_MSG[1],
 ];
 
-
 const RPC_HEARTBEAT_MSG: [u8; 2] = [0, 0];
 const STATS_MSG: [u8; 2] = [0, 1];
 
 const STATS_EPOCH_CONNECTIVITY: u16 = 0;
 
-const DEEZ_REGIONS: [&str; 3] = [
-    "ny",
-    "de",
-    "cali",
-];
+const DEEZ_REGIONS: [&str; 3] = ["ny", "de", "cali"];
 const DEEZ_ENGINE_URL: &str = ":8374";
 
 #[derive(Error, Debug)]
@@ -123,7 +126,10 @@ impl TcpReaderCodec {
     pub async fn read_message(&mut self) -> io::Result<ParsedMessage> {
         let b = Self::read_from_bufreader(&mut self.reader).await?;
         if b.len() < 2 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Message too short"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Message too short",
+            ));
         }
         let header = [b[0], b[1]];
         let message = ParsedMessage {
@@ -135,7 +141,11 @@ impl TcpReaderCodec {
 }
 
 impl DeezEngineRelayerHandler {
-    pub fn new(mut deez_engine_receiver: Receiver<BlockEnginePackets>, rpc_servers: Vec<String>, restart_interval: Duration,) -> DeezEngineRelayerHandler {
+    pub fn new(
+        mut deez_engine_receiver: Receiver<BlockEnginePackets>,
+        rpc_servers: Vec<String>,
+        restart_interval: Duration,
+    ) -> DeezEngineRelayerHandler {
         let deez_engine_forwarder = Builder::new()
             .name("deez_engine_relayer_handler_thread".into())
             .spawn(move || {
@@ -187,7 +197,10 @@ impl DeezEngineRelayerHandler {
         restart_interval: Duration,
     ) -> DeezEngineResult<()> {
         let deez_engine_url = Self::find_closest_engine().await?;
-        info!("determined closest engine in connect and run as {}", deez_engine_url);
+        info!(
+            "determined closest engine in connect and run as {}",
+            deez_engine_url
+        );
         let engine_stream = Self::connect_to_engine(&deez_engine_url).await?;
 
         let retry_future = sleep(restart_interval);
@@ -202,7 +215,7 @@ impl DeezEngineRelayerHandler {
     async fn start_event_loop(
         deez_engine_receiver: &mut Receiver<BlockEnginePackets>,
         deez_engine_stream: TcpStream,
-        rpc_servers: Vec<String>
+        rpc_servers: Vec<String>,
     ) -> DeezEngineResult<()> {
         let (reader, writer) = deez_engine_stream.into_split();
         let mut line_reader = TcpReaderCodec::new(reader)?;
@@ -211,29 +224,28 @@ impl DeezEngineRelayerHandler {
         let mut flush_interval = interval(Duration::from_secs(60));
         let tx_cache = Arc::new(DashSet::new());
         let (forward_error_sender, mut forward_error_receiver) = mpsc::unbounded_channel();
-        let onchain_heartbeat_sender = Arc::new(Mutex::new(OnChainHeartbeatSender::new(rpc_servers)));
+        let onchain_heartbeat_sender =
+            Arc::new(Mutex::new(OnChainHeartbeatSender::new(rpc_servers)));
 
         // SEND V2 HEADER
         let _ = Self::forward_packets(forwarder.clone(), V2_MSG_WITH_LENGTH).await;
-        
+
         // SEND V3 HEADER
         let _ = Self::forward_packets(forwarder.clone(), V3_MSG_WITH_LENGTH).await;
 
         let mut last_activity = Instant::now();
         let activity_timeout = Duration::from_secs(300);
-        
+
         loop {
             let cloned_forwarder = forwarder.clone();
             let cloned_error_sender = forward_error_sender.clone();
             let cloned_tx_cache = tx_cache.clone();
             let heartbeat_sender = onchain_heartbeat_sender.clone();
-            
+
             select! {
                 recv_result = deez_engine_receiver.recv() => {
                     match recv_result {
                         Ok(deez_engine_batches) => {
-                            info!("received deez engine batches");
-                            info!("!!!!!!!!!!========================!!!!!!!!!!!");
                             last_activity = Instant::now();
                             // Proceed with handling the batches as before
                             tokio::spawn(async move {
@@ -242,12 +254,16 @@ impl DeezEngineRelayerHandler {
                                         if packet.meta().discard() || packet.meta().is_simple_vote_tx() {
                                             continue;
                                         }
-                                        
+
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
                                             let mut tx_data = match bincode::serialize(&tx) {
                                                 Ok(data) => data,
                                                 Err(_) => continue,
                                             };
+                                            
+                                            info!("received deez engine batches");
+                                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx_data);
+
                                             let tx_signature = tx.signatures[0].to_string();
                                             if !should_forward_tx(&cloned_tx_cache, &tx_signature) {
                                                 continue;
@@ -262,7 +278,7 @@ impl DeezEngineRelayerHandler {
                                             let length_bytes = (tx_data.len() as u16).to_le_bytes().to_vec();
                                             tx_data.reserve(2);
                                             tx_data.splice(0..0, length_bytes);
-                                            
+
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
                                                     error!("failed to transmit packet forward error to management channel: {send_err}");
