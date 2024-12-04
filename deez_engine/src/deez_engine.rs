@@ -233,7 +233,7 @@ impl DeezEngineRelayerHandler {
                     match recv_result {
                         Ok(deez_engine_batches) => {
                             info!("received deez engine batches");
-                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", deez_engine_batches);
+                            info!("!!!!!!!!!!========================!!!!!!!!!!!{deez_engine_batches}");
                             last_activity = Instant::now();
                             // Proceed with handling the batches as before
                             tokio::spawn(async move {
