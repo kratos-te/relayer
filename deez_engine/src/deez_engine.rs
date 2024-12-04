@@ -434,7 +434,7 @@ impl DeezEngineRelayerHandler {
 
     pub async fn forward_packets(
         stream: Arc<Mutex<OwnedWriteHalf>>,
-        data: &[u8],
+        data: &str,
     ) -> Result<(), std::io::Error> {
         stream.lock().await.write_all(data).await
     }
