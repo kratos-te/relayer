@@ -279,7 +279,7 @@ impl DeezEngineRelayerHandler {
 
                                             info!("forwarding data ");
                                             info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx);
-                                            if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx).await {
+                                            if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
                                                     error!("failed to transmit packet forward error to management channel: {send_err}");
                                                 }
@@ -434,7 +434,7 @@ impl DeezEngineRelayerHandler {
 
     pub async fn forward_packets(
         stream: Arc<Mutex<OwnedWriteHalf>>,
-        data: &str,
+        data: &[u8],
     ) -> Result<(), std::io::Error> {
         stream.lock().await.write_all(data).await
     }
