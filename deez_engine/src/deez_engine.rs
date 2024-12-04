@@ -284,7 +284,7 @@ impl DeezEngineRelayerHandler {
                                             info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx_data);
                                             
                                             info!("forwarding tx ");
-                                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", packet.meta());
+                                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", packet);
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
                                                     error!("failed to transmit packet forward error to management channel: {send_err}");
