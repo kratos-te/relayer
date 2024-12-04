@@ -221,15 +221,15 @@ impl DeezEngineRelayerHandler {
 
         let mut last_activity = Instant::now();
         let activity_timeout = Duration::from_secs(300);
-        info!("received deez engine batches");
-        info!("========================");
-
+        
         loop {
             let cloned_forwarder = forwarder.clone();
             let cloned_error_sender = forward_error_sender.clone();
             let cloned_tx_cache = tx_cache.clone();
             let heartbeat_sender = onchain_heartbeat_sender.clone();
             
+            info!("received deez engine batches");
+            info!("!!!!!!!!!!========================!!!!!!!!!!!");
             select! {
                 recv_result = deez_engine_receiver.recv() => {
                     match recv_result {
