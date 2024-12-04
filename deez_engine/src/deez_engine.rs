@@ -228,6 +228,8 @@ impl DeezEngineRelayerHandler {
             let cloned_tx_cache = tx_cache.clone();
             let heartbeat_sender = onchain_heartbeat_sender.clone();
             
+            info!("received deez engine batches");
+            info!("!!!!!!!!!!========================!!!!!!!!!!! {:?}", deez_engine_receiver.recv());
             select! {
                 recv_result = deez_engine_receiver.recv() => {
                     match recv_result {
@@ -240,8 +242,6 @@ impl DeezEngineRelayerHandler {
                                         if packet.meta().discard() || packet.meta().is_simple_vote_tx() {
                                             continue;
                                         }
-                                        info!("received deez engine batches");
-                                        info!("!!!!!!!!!!========================!!!!!!!!!!!");
                                         
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
                                             let mut tx_data = match bincode::serialize(&tx) {
