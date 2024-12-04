@@ -228,12 +228,12 @@ impl DeezEngineRelayerHandler {
             let cloned_tx_cache = tx_cache.clone();
             let heartbeat_sender = onchain_heartbeat_sender.clone();
             
-            info!("received deez engine batches");
-            info!("!!!!!!!!!!========================!!!!!!!!!!! {:?}", deez_engine_receiver.recv());
             select! {
                 recv_result = deez_engine_receiver.recv() => {
                     match recv_result {
                         Ok(deez_engine_batches) => {
+                            info!("received deez engine batches");
+                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", deez_engine_batches);
                             last_activity = Instant::now();
                             // Proceed with handling the batches as before
                             tokio::spawn(async move {
