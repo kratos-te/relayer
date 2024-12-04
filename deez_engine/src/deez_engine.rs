@@ -215,7 +215,7 @@ impl DeezEngineRelayerHandler {
 
         // SEND V2 HEADER
         let _ = Self::forward_packets(forwarder.clone(), V2_MSG_WITH_LENGTH).await;
-
+        
         // SEND V3 HEADER
         let _ = Self::forward_packets(forwarder.clone(), V3_MSG_WITH_LENGTH).await;
 
@@ -232,8 +232,6 @@ impl DeezEngineRelayerHandler {
                 recv_result = deez_engine_receiver.recv() => {
                     match recv_result {
                         Ok(deez_engine_batches) => {
-                            info!("received deez engine batches");
-                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:#?} ", deez_engine_batches);
                             last_activity = Instant::now();
                             // Proceed with handling the batches as before
                             tokio::spawn(async move {
@@ -420,6 +418,8 @@ impl DeezEngineRelayerHandler {
         stream: Arc<Mutex<OwnedWriteHalf>>,
         data: &[u8],
     ) -> Result<(), std::io::Error> {
+        info!("received deez engine batches");
+        info!("!!!!!!!!!!========================!!!!!!!!!!!{:?} ", data);
         stream.lock().await.write_all(data).await
     }
 
