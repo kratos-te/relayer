@@ -256,6 +256,9 @@ impl DeezEngineRelayerHandler {
                                         }
 
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
+                                            
+                                            info!("received tx");
+                                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx);
                                             let mut tx_data = match bincode::serialize(&tx) {
                                                 Ok(data) => data,
                                                 Err(_) => continue,
