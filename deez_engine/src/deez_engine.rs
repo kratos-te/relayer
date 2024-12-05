@@ -244,6 +244,7 @@ impl DeezEngineRelayerHandler {
             let cloned_error_sender = forward_error_sender.clone();
             let cloned_tx_cache: Arc<DashSet<String>> = tx_cache.clone();
             let heartbeat_sender = onchain_heartbeat_sender.clone();
+            info!("{:?}", rpc_url.to_string());
             let rpc_client =
                 RpcClient::new_with_commitment(rpc_url.to_string(), CommitmentConfig::processed());
 
@@ -263,9 +264,13 @@ impl DeezEngineRelayerHandler {
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
                                             // simulate deserialized tx to get innerIns
                                             let simulation_res = match rpc_client.simulate_transaction(&tx).await {
-                                                Ok(res) => res.value,
+                                                Ok(res) => {
+                                                    info!("{:?}", res);
+                                                    res.value
+                                                },
                                                 Err(_) => continue,
                                             };
+
                                             let inner_ins: Vec<UiInnerInstructions> = simulation_res.inner_instructions.unwrap_or(Vec::new());
 
                                             // build forward msg
