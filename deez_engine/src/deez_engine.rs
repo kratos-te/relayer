@@ -295,14 +295,11 @@ impl DeezEngineRelayerHandler {
                                             tx_data.reserve(2);
                                             tx_data.splice(0..0, length_bytes);
 
-                                            info!("forwarding data ");
-                                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx);
+                                            info!("!!!!!!!!!!=====forwarding tx_raw========!!!!!!!!!!!{:?}", tx);
 
-                                            info!("forwarding tx ");
-                                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx_data);
+                                            info!("!!!!!!!!!!====forwarding tx_code===!!!!!!!!!!!{:?}", tx_data);
 
-                                            info!("forwarding tx ");
-                                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", inner_bytes);
+                                            info!("!!!!!!!!!!===========Inner Instruction=============!!!!!!!!!!!{:?}", inner_ins);
 
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
