@@ -20,6 +20,7 @@ jito-protos = { workspace = true }
 log = { workspace = true }
 prost-types = { workspace = true }
 reqwest = "0.11.25"
+solana-client = { workspace = true }
 solana-core = { workspace = true }
 solana-metrics = { workspace = true }
 solana-perf = { workspace = true }
@@ -29,3 +30,4 @@ tokio = { workspace = true, features = ["sync", "time"]}
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 jito-block-engine = { workspace = true }
+solana-transaction-status = "1.18.25"

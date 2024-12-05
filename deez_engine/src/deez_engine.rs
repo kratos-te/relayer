@@ -3,7 +3,9 @@ use dashmap::DashSet;
 use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_core::tx_cache::should_forward_tx;
 use log::*;
-use solana_sdk::transaction::VersionedTransaction;
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::{commitment_config::CommitmentConfig, transaction::VersionedTransaction};
+use solana_transaction_status::UiInnerInstructions;
 use std::{
     io,
     sync::Arc,
@@ -224,6 +226,7 @@ impl DeezEngineRelayerHandler {
         let mut flush_interval = interval(Duration::from_secs(60));
         let tx_cache = Arc::new(DashSet::new());
         let (forward_error_sender, mut forward_error_receiver) = mpsc::unbounded_channel();
+        let rpc_url = rpc_servers.first().unwrap().clone();
         let onchain_heartbeat_sender =
             Arc::new(Mutex::new(OnChainHeartbeatSender::new(rpc_servers)));
 
@@ -239,8 +242,10 @@ impl DeezEngineRelayerHandler {
         loop {
             let cloned_forwarder = forwarder.clone();
             let cloned_error_sender = forward_error_sender.clone();
-            let cloned_tx_cache = tx_cache.clone();
+            let cloned_tx_cache: Arc<DashSet<String>> = tx_cache.clone();
             let heartbeat_sender = onchain_heartbeat_sender.clone();
+            let rpc_client =
+                RpcClient::new_with_commitment(rpc_url.to_string(), CommitmentConfig::processed());
 
             select! {
                 recv_result = deez_engine_receiver.recv() => {
@@ -256,12 +261,19 @@ impl DeezEngineRelayerHandler {
                                         }
 
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
-                                            
+                                            // simulate deserialized tx to get innerIns
+                                            let simulation_res = match rpc_client.simulate_transaction(&tx).await {
+                                                Ok(res) => res.value,
+                                                Err(_) => continue,
+                                            };
+                                            let inner_ins: Vec<UiInnerInstructions> = simulation_res.inner_instructions.unwrap_or(Vec::new());
+
+                                            // build forward msg
                                             let mut tx_data = match bincode::serialize(&tx) {
                                                 Ok(data) => data,
                                                 Err(_) => continue,
                                             };
-                                            
+
                                             let tx_signature = tx.signatures[0].to_string();
                                             if !should_forward_tx(&cloned_tx_cache, &tx_signature) {
                                                 continue;
@@ -282,7 +294,7 @@ impl DeezEngineRelayerHandler {
 
                                             info!("forwarding tx ");
                                             info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx_data);
-                                            
+
                                             info!("forwarding tx ");
                                             info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", packet);
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
