@@ -3,7 +3,7 @@ use dashmap::DashSet;
 use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_core::tx_cache::should_forward_tx;
 use log::*;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSimulateTransactionConfig};
 use solana_sdk::{commitment_config::CommitmentConfig, transaction::VersionedTransaction};
 use solana_transaction_status::UiInnerInstructions;
 use std::{
@@ -239,6 +239,12 @@ impl DeezEngineRelayerHandler {
         let mut last_activity = Instant::now();
         let activity_timeout = Duration::from_secs(300);
 
+        let config = RpcSimulateTransactionConfig {
+            sig_verify: false,
+            replace_recent_blockhash: true,
+            ..RpcSimulateTransactionConfig::default()
+        };
+
         loop {
             let cloned_forwarder = forwarder.clone();
             let cloned_error_sender = forward_error_sender.clone();
@@ -263,7 +269,7 @@ impl DeezEngineRelayerHandler {
 
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
                                             // simulate deserialized tx to get innerIns
-                                            let simulation_res = match rpc_client.simulate_transaction(&tx).await {
+                                            let simulation_res = match rpc_client.simulate_transaction_with_config(&tx, config.clone()).await {
                                                 Ok(res) => {
                                                     info!("{:?}", res);
                                                     res.value
