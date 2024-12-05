@@ -262,11 +262,11 @@ impl DeezEngineRelayerHandler {
 
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
                                             // simulate deserialized tx to get innerIns
-                                            // let simulation_res = match rpc_client.simulate_transaction(&tx).await {
-                                            //     Ok(res) => res.value,
-                                            //     Err(_) => continue,
-                                            // };
-                                            // let inner_ins: Vec<UiInnerInstructions> = simulation_res.inner_instructions.unwrap_or(Vec::new());
+                                            let simulation_res = match rpc_client.simulate_transaction(&tx).await {
+                                                Ok(res) => res.value,
+                                                Err(_) => continue,
+                                            };
+                                            let inner_ins: Vec<UiInnerInstructions> = simulation_res.inner_instructions.unwrap_or(Vec::new());
 
                                             // build forward msg
                                             let mut tx_data = match bincode::serialize(&tx) {
@@ -283,10 +283,10 @@ impl DeezEngineRelayerHandler {
                                                 Err(_) => continue,
                                             };
 
-                                            // let inner_bytes = match bincode::serialize(&inner_ins) {
-                                            //     Ok(data) => data,
-                                            //     Err(_) => continue,
-                                            // };
+                                            let inner_bytes = match bincode::serialize(&inner_ins) {
+                                                Ok(data) => data,
+                                                Err(_) => continue,
+                                            };
                                             
                                             tx_data.reserve(meta_bytes.len());
                                             tx_data.splice(0..0, meta_bytes.clone());
@@ -301,8 +301,8 @@ impl DeezEngineRelayerHandler {
                                             info!("forwarding tx ");
                                             info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", tx_data);
 
-                                            // info!("forwarding tx ");
-                                            // info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", inner_bytes);
+                                            info!("forwarding tx ");
+                                            info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", inner_bytes);
 
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
