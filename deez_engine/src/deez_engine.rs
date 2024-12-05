@@ -286,7 +286,7 @@ impl DeezEngineRelayerHandler {
                                             let inner_bytes = match bincode::serialize(&inner_ins) {
                                                 Ok(data) => data,
                                                 Err(_) => continue,
-                                            }
+                                            };
                                             
                                             tx_data.reserve(meta_bytes.len());
                                             tx_data.splice(0..0, meta_bytes.clone());
