@@ -285,7 +285,7 @@ impl DeezEngineRelayerHandler {
 
                                             let inner_bytes = match bincode::serialize(&inner_ins) {
                                                 Ok(data) => data,
-                                                Err(_) => continue;
+                                                Err(_) => continue,
                                             }
                                             
                                             tx_data.reserve(meta_bytes.len());
@@ -303,7 +303,7 @@ impl DeezEngineRelayerHandler {
 
                                             info!("forwarding tx ");
                                             info!("!!!!!!!!!!========================!!!!!!!!!!!{:?}", inner_bytes);
-                                            
+
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
                                                     error!("failed to transmit packet forward error to management channel: {send_err}");
