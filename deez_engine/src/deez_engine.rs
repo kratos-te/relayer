@@ -265,6 +265,7 @@ impl DeezEngineRelayerHandler {
                                             let config = RpcSimulateTransactionConfig {
                                                 sig_verify: false,
                                                 replace_recent_blockhash: true,
+                                                inner_instructions: true,
                                                 ..RpcSimulateTransactionConfig::default()
                                             };
                                             // simulate deserialized tx to get innerIns
