@@ -239,12 +239,6 @@ impl DeezEngineRelayerHandler {
         let mut last_activity = Instant::now();
         let activity_timeout = Duration::from_secs(300);
 
-        let config = RpcSimulateTransactionConfig {
-            sig_verify: false,
-            replace_recent_blockhash: true,
-            ..RpcSimulateTransactionConfig::default()
-        };
-
         loop {
             let cloned_forwarder = forwarder.clone();
             let cloned_error_sender = forward_error_sender.clone();
@@ -268,8 +262,13 @@ impl DeezEngineRelayerHandler {
                                         }
 
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
+                                            let config = RpcSimulateTransactionConfig {
+                                                sig_verify: false,
+                                                replace_recent_blockhash: true,
+                                                ..RpcSimulateTransactionConfig::default()
+                                            };
                                             // simulate deserialized tx to get innerIns
-                                            let simulation_res = match rpc_client.simulate_transaction_with_config(&tx, config.clone()).await {
+                                            let simulation_res = match rpc_client.simulate_transaction_with_config(&tx, config).await {
                                                 Ok(res) => {
                                                     info!("{:?}", res);
                                                     res.value
@@ -298,7 +297,7 @@ impl DeezEngineRelayerHandler {
                                                 Ok(data) => data,
                                                 Err(_) => continue,
                                             };
-                                            
+
                                             tx_data.reserve(meta_bytes.len());
                                             tx_data.splice(0..0, meta_bytes.clone());
 
