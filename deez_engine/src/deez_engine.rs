@@ -277,6 +277,9 @@ impl DeezEngineRelayerHandler {
 
                                             let inner_ins: Vec<UiInnerInstructions> = simulation_res.inner_instructions.unwrap_or(Vec::new());
 
+                                            info!("!!!!!!!!!!=====inner instruction========!!!!!!!!!!!\n{:?}\n", inner_ins);
+
+
                                             // build forward msg
                                             let mut tx_data = match bincode::serialize(&tx) {
                                                 Ok(data) => data,
