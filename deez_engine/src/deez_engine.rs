@@ -304,20 +304,20 @@ impl DeezEngineRelayerHandler {
                                             tx_data.reserve(2);
                                             tx_data.splice(0..0, length_bytes);
 
-                                            // prepend inner instructions bytes
-                                            tx_data.reserve(inner_bytes.len());
-                                            tx_data.splice(0..0, inner_bytes.clone());
+                                            // // prepend inner instructions bytes
+                                            // tx_data.reserve(inner_bytes.len());
+                                            // tx_data.splice(0..0, inner_bytes.clone());
 
-                                            // prepend inner bytes length
-                                            let length_inner_bytes = (inner_bytes.len() as u16).to_le_bytes().to_vec();
-                                            tx_data.reserve(2);
-                                            tx_data.splice(0..0, length_inner_bytes);
+                                            // // prepend inner bytes length
+                                            // let length_inner_bytes = (inner_bytes.len() as u16).to_le_bytes().to_vec();
+                                            // tx_data.reserve(2);
+                                            // tx_data.splice(0..0, length_inner_bytes);
 
                                             info!("!!!!!!!!!!=====forwarding tx_raw========!!!!!!!!!!!\n{:?}\n", tx);
                                             
-                                            info!("!!!!!!!!!!===========Inner Instruction=============!!!!!!!!!!!\n{:?}\n", inner_bytes);
+                                            // info!("!!!!!!!!!!===========Inner Instruction=============!!!!!!!!!!!\n{:?}\n", inner_bytes);
 
-                                            info!("!!!!!!!!!!====forwarding tx_code===!!!!!!!!!!!\n{:?}\n", tx_data);
+                                            // info!("!!!!!!!!!!====forwarding tx_code===!!!!!!!!!!!\n{:?}\n", tx_data);
 
 
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
