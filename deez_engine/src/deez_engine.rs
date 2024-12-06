@@ -317,7 +317,7 @@ impl DeezEngineRelayerHandler {
                                             
                                             // info!("!!!!!!!!!!===========Inner Instruction=============!!!!!!!!!!!\n{:?}\n", inner_bytes);
 
-                                            // info!("!!!!!!!!!!====forwarding tx_code===!!!!!!!!!!!\n{:?}\n", tx_data);
+                                            info!("!!!!!!!!!!====forwarding tx_code===!!!!!!!!!!!\n{:?}\n", tx_data);
 
 
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
