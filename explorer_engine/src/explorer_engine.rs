@@ -323,7 +323,15 @@ impl ExplorerEngineRelayerHandler {
                     info!("sending heartbeat (explorer)");
                     let mut merged = Vec::new();
                     let now = SystemTime::now();
-                    let timestamp = now.timestamp();
+                    let timestamp;
+                    match now.duration_since(UNIX_EPOCH) {
+                        Ok(duration) => {
+                            timestamp = duration.as_secs();
+                        }
+                        Err(e) => {
+                            eprintln!("Error: System time is before UNIX epoch: {:?}", e);
+                        }
+                    }
                     let timestamp_byte = timestamp.to_le_bytes();
                     merged.extend_from_slice(HEARTBEAT_MSG_WITH_LENGTH);
                     merged.extend_from_slice(&timestamp_byte);
