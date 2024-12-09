@@ -323,7 +323,7 @@ impl ExplorerEngineRelayerHandler {
                     info!("sending heartbeat (explorer)");
                     let mut merged = Vec::new();
                     let now = SystemTime::now();
-                    let timestamp;
+                    let timestamp:u64 = 0;
                     match now.duration_since(UNIX_EPOCH) {
                         Ok(duration) => {
                             timestamp = duration.as_secs();
