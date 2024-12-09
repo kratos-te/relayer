@@ -17,7 +17,7 @@ use std::{
 use clap::Parser;
 use crossbeam_channel::tick;
 use dashmap::DashMap;
-use deez_engine::deez_engine::DeezEngineRelayerHandler;
+use explorer_engine::explorer_engine::ExplorerEngineRelayerHandler;
 use env_logger::Env;
 use jito_block_engine::block_engine::{BlockEngineConfig, BlockEngineRelayerHandler};
 use jito_core::{
@@ -461,7 +461,7 @@ fn main() {
     let (block_engine_sender, block_engine_receiver) =
         channel(jito_transaction_relayer::forwarder::BLOCK_ENGINE_FORWARDER_QUEUE_CAPACITY);
 
-    let deez_engine_receiver = block_engine_sender.subscribe();
+    let explorer_engine_receiver = block_engine_sender.subscribe();
 
     let forward_and_delay_threads = start_forward_and_delay_thread(
         verified_receiver,
@@ -500,7 +500,7 @@ fn main() {
     let rpc_servers = servers.iter().map(|(rpc, _)| rpc.clone()).collect();
 
     let restart_interval = Duration::from_secs(1 * 60 * 60); // 4 hours in seconds
-    let deez_engine_forwarder = DeezEngineRelayerHandler::new(deez_engine_receiver, rpc_servers, restart_interval);
+    let explorer_engine_forwarder = ExplorerEngineRelayerHandler::new(explorer_engine_receiver, rpc_servers, restart_interval);
 
     // receiver tracked as relayer_metrics.slot_receiver_len
     // downstream channel gets data that was duplicated by HealthManager
@@ -611,7 +611,7 @@ fn main() {
     }
     lookup_table_refresher.join().unwrap();
     block_engine_forwarder.join();
-    deez_engine_forwarder.join();
+    explorer_engine_forwarder.join();
 }
 
 pub async fn shutdown_signal(exit: Arc<AtomicBool>) {

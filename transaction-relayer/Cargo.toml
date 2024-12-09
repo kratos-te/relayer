@@ -17,7 +17,7 @@ env_logger = { workspace = true }
 hostname = { workspace = true }
 itertools = { workspace = true }
 jito-block-engine = { workspace = true }
-deez_engine = { workspace = true }
+explorer_engine = { workspace = true }
 jito-core = { workspace = true }
 jito-protos = { workspace = true }
 jito-relayer = { workspace = true }

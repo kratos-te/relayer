@@ -1483,32 +1483,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
 
 [[package]]
-name = "deez_engine"
-version = "0.2.2"
-dependencies = [
- "base64 0.22.1",
- "bincode",
- "cached",
- "dashmap",
- "jito-block-engine",
- "jito-core",
- "jito-protos",
- "log",
- "prost-types 0.12.3",
- "reqwest",
- "solana-client",
- "solana-core",
- "solana-metrics",
- "solana-perf",
- "solana-sdk",
- "solana-transaction-status",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tonic 0.10.2",
-]
-
-[[package]]
 name = "der"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1835,6 +1809,32 @@ name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
+
+[[package]]
+name = "explorer_engine"
+version = "0.2.2"
+dependencies = [
+ "base64 0.22.1",
+ "bincode",
+ "cached",
+ "dashmap",
+ "jito-block-engine",
+ "jito-core",
+ "jito-protos",
+ "log",
+ "prost-types 0.12.3",
+ "reqwest",
+ "solana-client",
+ "solana-core",
+ "solana-metrics",
+ "solana-perf",
+ "solana-sdk",
+ "solana-transaction-status",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tonic 0.10.2",
+]
 
 [[package]]
 name = "fast-math"
@@ -2730,8 +2730,8 @@ dependencies = [
  "clap 4.4.8",
  "crossbeam-channel",
  "dashmap",
- "deez_engine",
  "env_logger",
+ "explorer_engine",
  "hostname",
  "itertools 0.10.5",
  "jito-block-engine",

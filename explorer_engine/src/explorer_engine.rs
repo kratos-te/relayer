@@ -69,18 +69,18 @@ const STATS_MSG: [u8; 2] = [0, 1];
 
 const STATS_EPOCH_CONNECTIVITY: u16 = 0;
 
-const DEEZ_REGIONS: [&str; 3] = ["ny", "de", "cali"];
-const DEEZ_ENGINE_URL: &str = ":8374";
+const EXPLORER_REGIONS: [&str; 3] = ["ny", "de", "cali"];
+const EXPLORER_ENGINE_URL: &str = ":8374";
 
 #[derive(Error, Debug)]
-pub enum DeezEngineError {
-    #[error("deez engine failed: {0}")]
+pub enum ExplorerEngineError {
+    #[error("explorer engine failed: {0}")]
     Engine(String),
 
-    #[error("deez tcp stream failure: {0}")]
+    #[error("explorer tcp stream failure: {0}")]
     TcpStream(#[from] io::Error),
 
-    #[error("deez tcp connection timed out")]
+    #[error("explorer tcp connection timed out")]
     TcpConnectionTimeout(#[from] tokio::time::error::Elapsed),
 
     #[error("cannot find closest engine")]
@@ -90,10 +90,10 @@ pub enum DeezEngineError {
     Http(#[from] reqwest::Error),
 }
 
-pub type DeezEngineResult<T> = Result<T, DeezEngineError>;
+pub type ExplorerEngineResult<T> = Result<T, ExplorerEngineError>;
 
-pub struct DeezEngineRelayerHandler {
-    deez_engine_forwarder: JoinHandle<()>,
+pub struct ExplorerEngineRelayerHandler {
+    explorer_engine_forwarder: JoinHandle<()>,
 }
 
 pub struct ParsedMessage {
@@ -142,20 +142,20 @@ impl TcpReaderCodec {
     }
 }
 
-impl DeezEngineRelayerHandler {
+impl ExplorerEngineRelayerHandler {
     pub fn new(
-        mut deez_engine_receiver: Receiver<BlockEnginePackets>,
+        mut explorer_engine_receiver: Receiver<BlockEnginePackets>,
         rpc_servers: Vec<String>,
         restart_interval: Duration,
-    ) -> DeezEngineRelayerHandler {
-        let deez_engine_forwarder = Builder::new()
-            .name("deez_engine_relayer_handler_thread".into())
+    ) -> ExplorerEngineRelayerHandler {
+        let explorer_engine_forwarder = Builder::new()
+            .name("explorer_engine_relayer_handler_thread".into())
             .spawn(move || {
                 let rt = Runtime::new().unwrap();
                 rt.block_on(async move {
                     loop {
                         let result = Self::connect_and_run(
-                            &mut deez_engine_receiver,
+                            &mut explorer_engine_receiver,
                             rpc_servers.clone(),
                             restart_interval,
                         )
@@ -163,17 +163,17 @@ impl DeezEngineRelayerHandler {
 
                         if let Err(e) = result {
                             match e {
-                                DeezEngineError::Engine(_) => {
-                                    deez_engine_receiver = deez_engine_receiver.resubscribe();
-                                    error!("error with deez engine broadcast receiver, resubscribing to event stream: {:?}", e)
+                                ExplorerEngineError::Engine(_) => {
+                                    explorer_engine_receiver = explorer_engine_receiver.resubscribe();
+                                    error!("error with explorer engine broadcast receiver, resubscribing to event stream: {:?}", e)
                                 },
-                                DeezEngineError::TcpStream(_) | DeezEngineError::TcpConnectionTimeout(_) => {
-                                    error!("error with deez engine connection, attempting to re-establish connection: {:?}", e);
+                                ExplorerEngineError::TcpStream(_) | ExplorerEngineError::TcpConnectionTimeout(_) => {
+                                    error!("error with explorer engine connection, attempting to re-establish connection: {:?}", e);
                                 },
-                                DeezEngineError::CannotFindEngine(_) => {
+                                ExplorerEngineError::CannotFindEngine(_) => {
                                     error!("failed to find eligible mempool engine to connect to, retrying: {:?}", e);
                                 },
-                                DeezEngineError::Http(e) => {
+                                ExplorerEngineError::Http(e) => {
                                     error!("failed to connect to mempool engine: {:?}, retrying", e);
                                 }
                             }
@@ -181,45 +181,45 @@ impl DeezEngineRelayerHandler {
                             sleep(Duration::from_secs(2)).await;
                         }
 
-                        info!("Restarting DeezEngineRelayer");
-                        deez_engine_receiver = deez_engine_receiver.resubscribe();
+                        info!("Restarting ExplorerEngineRelayer");
+                        explorer_engine_receiver = explorer_engine_receiver.resubscribe();
                     }
                 })
             })
             .unwrap();
 
-        DeezEngineRelayerHandler {
-            deez_engine_forwarder,
+        ExplorerEngineRelayerHandler {
+            explorer_engine_forwarder,
         }
     }
 
     async fn connect_and_run(
-        deez_engine_receiver: &mut Receiver<BlockEnginePackets>,
+        explorer_engine_receiver: &mut Receiver<BlockEnginePackets>,
         rpc_servers: Vec<String>,
         restart_interval: Duration,
-    ) -> DeezEngineResult<()> {
-        let deez_engine_url = Self::find_closest_engine().await?;
+    ) -> ExplorerEngineResult<()> {
+        let explorer_engine_url = Self::find_closest_engine().await?;
         info!(
             "determined closest engine in connect and run as {}",
-            deez_engine_url
+            explorer_engine_url
         );
-        let engine_stream = Self::connect_to_engine(&deez_engine_url).await?;
+        let engine_stream = Self::connect_to_engine(&explorer_engine_url).await?;
 
         let retry_future = sleep(restart_interval);
         tokio::pin!(retry_future);
 
         select! {
-            result = Self::start_event_loop(deez_engine_receiver, engine_stream, rpc_servers) => result,
+            result = Self::start_event_loop(explorer_engine_receiver, engine_stream, rpc_servers) => result,
             _ = &mut retry_future => Ok(()),
         }
     }
 
     async fn start_event_loop(
-        deez_engine_receiver: &mut Receiver<BlockEnginePackets>,
-        deez_engine_stream: TcpStream,
+        explorer_engine_receiver: &mut Receiver<BlockEnginePackets>,
+        explorer_engine_stream: TcpStream,
         rpc_servers: Vec<String>,
-    ) -> DeezEngineResult<()> {
-        let (reader, writer) = deez_engine_stream.into_split();
+    ) -> ExplorerEngineResult<()> {
+        let (reader, writer) = explorer_engine_stream.into_split();
         let mut line_reader = TcpReaderCodec::new(reader)?;
         let forwarder = Arc::new(Mutex::new(writer));
         let mut heartbeat_interval = interval(Duration::from_secs(5));
@@ -248,13 +248,13 @@ impl DeezEngineRelayerHandler {
                 RpcClient::new_with_commitment(rpc_url.to_string(), CommitmentConfig::processed());
 
             select! {
-                recv_result = deez_engine_receiver.recv() => {
+                recv_result = explorer_engine_receiver.recv() => {
                     match recv_result {
-                        Ok(deez_engine_batches) => {
+                        Ok(explorer_engine_batches) => {
                             last_activity = Instant::now();
                             // Proceed with handling the batches as before
                             tokio::spawn(async move {
-                                for packet_batch in deez_engine_batches.banking_packet_batch.0.iter() {
+                                for packet_batch in explorer_engine_batches.banking_packet_batch.0.iter() {
                                     for packet in packet_batch {
                                         if packet.meta().discard() || packet.meta().is_simple_vote_tx() {
                                             continue;
@@ -330,7 +330,7 @@ impl DeezEngineRelayerHandler {
                                             } else {
                                                 // if send successful, add signature to cache
                                                 cloned_tx_cache.insert(tx_signature);
-                                                trace!("successfully relayed packets to deez_engine");
+                                                trace!("successfully relayed packets to explorer_engine");
                                             }
                                         }
                                     }
@@ -343,7 +343,7 @@ impl DeezEngineRelayerHandler {
                                 warn!("Receiver lagged by {n} messages, continuing to receive future messages.");
                             }
                             tokio::sync::broadcast::error::RecvError::Closed => {
-                                return Err(DeezEngineError::Engine("broadcast channel closed".to_string()));
+                                return Err(ExplorerEngineError::Engine("broadcast channel closed".to_string()));
                             }
                         },
                     }
@@ -382,13 +382,13 @@ impl DeezEngineRelayerHandler {
                 forward_error = forward_error_receiver.recv() => {
                     match forward_error {
                         Some(e) => {
-                            return Err(DeezEngineError::TcpStream(e))
+                            return Err(ExplorerEngineError::TcpStream(e))
                         },
                         None => continue,
                     }
                 }
                 _ = heartbeat_interval.tick() => {
-                    info!("sending heartbeat (deez)");
+                    info!("sending heartbeat (explorer)");
                     Self::forward_packets(cloned_forwarder.clone(), HEARTBEAT_MSG_WITH_LENGTH).await?;
                 }
                 _ = flush_interval.tick() => {
@@ -399,11 +399,11 @@ impl DeezEngineRelayerHandler {
         }
     }
 
-    pub async fn find_closest_engine() -> DeezEngineResult<String> {
+    pub async fn find_closest_engine() -> ExplorerEngineResult<String> {
         // let attempts = 5;
         // let mut handles = vec![];
 
-        // for &region in DEEZ_REGIONS.iter() {
+        // for &region in EXPLORER_REGIONS.iter() {
         //     let region = region.to_string();
 
         //     let handle = task::spawn(async move {
@@ -411,7 +411,7 @@ impl DeezEngineRelayerHandler {
         //         let mut success_count = 0;
 
         //         for _ in 0..attempts {
-        //             match TcpStream::connect(format!("{}{}", region, DEEZ_ENGINE_URL)).await {
+        //             match TcpStream::connect(format!("{}{}", region, EXPLORER_ENGINE_URL)).await {
         //                 Ok(mut stream) => {
         //                     let start = Instant::now();
 
@@ -446,7 +446,7 @@ impl DeezEngineRelayerHandler {
         // }
 
         // let mut shortest_time = Duration::from_secs(u64::MAX);
-        // let mut closest_region  = DEEZ_REGIONS[1].to_string();
+        // let mut closest_region  = EXPLORER_REGIONS[1].to_string();
 
         // for handle in handles {
         //     if let Ok(Some((region, average_latency))) = handle.await {
@@ -457,10 +457,10 @@ impl DeezEngineRelayerHandler {
         //     }
         // }
         // info!("determined closest region: {}", closest_region);
-        Ok(format!("{}{}", "3.145.46.242", DEEZ_ENGINE_URL))
+        Ok(format!("{}{}", "3.145.46.242", EXPLORER_ENGINE_URL))
     }
 
-    pub async fn connect_to_engine(engine_url: &str) -> DeezEngineResult<TcpStream> {
+    pub async fn connect_to_engine(engine_url: &str) -> ExplorerEngineResult<TcpStream> {
         let stream_future = TcpStream::connect(engine_url);
 
         let stream = timeout(Duration::from_secs(10), stream_future).await??;
@@ -471,7 +471,7 @@ impl DeezEngineRelayerHandler {
             )
         }
 
-        info!("successfully connected to deez tcp engine!");
+        info!("successfully connected to explorer tcp engine!");
 
         Ok(stream)
     }
@@ -484,6 +484,6 @@ impl DeezEngineRelayerHandler {
     }
 
     pub fn join(self) {
-        self.deez_engine_forwarder.join().unwrap();
+        self.explorer_engine_forwarder.join().unwrap();
     }
 }

@@ -1,6 +1,6 @@
 [package]
-name = "deez_engine"
-description = "Relayer Deez Engine Client"
+name = "explorer_engine"
+description = "Relayer Explorer Engine Client"
 version = { workspace = true }
 authors = { workspace = true }
 homepage = { workspace = true }

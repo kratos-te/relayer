@@ -1,5 +1,5 @@
 {
 	"rust-analyzer.linkedProjects": [
-		"./deez_engine/Cargo.toml"
+		"./explorer_engine/Cargo.toml"
 	]
 }

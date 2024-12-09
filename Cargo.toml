@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "block_engine",
-    "deez_engine",
+    "explorer_engine",
     "core",
     "jito-protos",
     #    "packet_blaster", // TODO (LB): fix
@@ -39,7 +39,7 @@ hostname = "0.3"
 indexmap = "2.2.5"
 itertools = "0.10.5"
 jito-block-engine = { path = "block_engine", version = "=0.2.2" }
-deez_engine = { path = "deez_engine", version = "=0.2.2"}
+explorer_engine = { path = "explorer_engine", version = "=0.2.2"}
 jito-core = { path = "core", version = "=0.2.2" }
 jito-protos = { path = "jito-protos", version = "=0.2.2" }
 jito-relayer = { path = "relayer", version = "=0.2.2" }
