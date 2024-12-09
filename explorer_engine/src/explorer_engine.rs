@@ -322,7 +322,7 @@ impl ExplorerEngineRelayerHandler {
                 _ = heartbeat_interval.tick() => {
                     info!("sending heartbeat (explorer)");
                     let mut merged = Vec::new();
-                    let now = SystemTime:now();
+                    let now = SystemTime::now();
                     let timestamp = now.timestamp();
                     let timestamp_byte = timestamp.to_le_bytes();
                     merged.extend_from_slice(HEARTBEAT_MSG_WITH_LENGTH);
