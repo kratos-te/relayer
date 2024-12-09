@@ -26,7 +26,7 @@ use tokio::{
 };
 
 const HEARTBEAT_LEN: u16 = 4;
-const HEARTBEAT_MSG: &[u8; 4] = b"ping  ";
+const HEARTBEAT_MSG: &[u8; 6] = b"ping  ";
 const HEARTBEAT_MSG_WITH_LENGTH: &[u8; 8] = &[
     (HEARTBEAT_LEN & 0xFF) as u8,
     ((HEARTBEAT_LEN >> 8) & 0xFF) as u8,
@@ -322,12 +322,11 @@ impl ExplorerEngineRelayerHandler {
                 _ = heartbeat_interval.tick() => {
                     info!("sending heartbeat (explorer)");
                     let mut merged = Vec::new();
-                    let timestamp = last_activity.timestamp();
-                    let timestamp_byte = timestamp.to_le_bytes();
+                    let timestamp_byte = last_activity.to_le_bytes();
                     merged.extend_from_slice(HEARTBEAT_MSG_WITH_LENGTH);
                     merged.extend_from_slice(&timestamp_byte);
                     info!("current sending message!!!------------{:?}", merged);
-                    Self::forward_packets(cloned_forwarder.clone(), merged).await?;
+                    Self::forward_packets(cloned_forwarder.clone(), &merged).await?;
                 }
                 _ = flush_interval.tick() => {
                     info!("flushing signature cache");
