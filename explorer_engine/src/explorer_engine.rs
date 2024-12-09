@@ -10,7 +10,7 @@ use std::{
     io,
     sync::Arc,
     thread::{Builder, JoinHandle},
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, BufReader};
