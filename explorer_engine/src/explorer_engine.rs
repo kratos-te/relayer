@@ -26,42 +26,16 @@ use tokio::{
 };
 
 const HEARTBEAT_LEN: u16 = 4;
-const PONG_MESSAGE: &[u8; 4] = b"pong";
-const PONG_MSG_WITH_LENGTH: &[u8; 6] = &[
-    (HEARTBEAT_LEN & 0xFF) as u8,
-    ((HEARTBEAT_LEN >> 8) & 0xFF) as u8,
-    PONG_MESSAGE[0],
-    PONG_MESSAGE[1],
-    PONG_MESSAGE[2],
-    PONG_MESSAGE[3],
-];
-
-const HEARTBEAT_MSG: &[u8; 4] = b"ping";
-const HEARTBEAT_MSG_WITH_LENGTH: &[u8; 6] = &[
+const HEARTBEAT_MSG: &[u8; 4] = b"ping  ";
+const HEARTBEAT_MSG_WITH_LENGTH: &[u8; 8] = &[
     (HEARTBEAT_LEN & 0xFF) as u8,
     ((HEARTBEAT_LEN >> 8) & 0xFF) as u8,
     HEARTBEAT_MSG[0],
     HEARTBEAT_MSG[1],
     HEARTBEAT_MSG[2],
     HEARTBEAT_MSG[3],
-];
-
-const V2_LEN: u16 = 2;
-const V2_MSG: &[u8; 2] = b"v2";
-const V2_MSG_WITH_LENGTH: &[u8; 4] = &[
-    (V2_LEN & 0xFF) as u8,
-    ((V2_LEN >> 8) & 0xFF) as u8,
-    V2_MSG[0],
-    V2_MSG[1],
-];
-
-const V3_LEN: u16 = 2;
-const V3_MSG: &[u8; 2] = b"v3";
-const V3_MSG_WITH_LENGTH: &[u8; 4] = &[
-    (V3_LEN & 0xFF) as u8,
-    ((V3_LEN >> 8) & 0xFF) as u8,
-    V3_MSG[0],
-    V3_MSG[1],
+    HEARTBEAT_MSG[4],
+    HEARTBEAT_MSG[5],
 ];
 
 const RPC_HEARTBEAT_MSG: [u8; 2] = [0, 0];
@@ -230,12 +204,6 @@ impl ExplorerEngineRelayerHandler {
         let onchain_heartbeat_sender =
             Arc::new(Mutex::new(OnChainHeartbeatSender::new(rpc_servers)));
 
-        // SEND V2 HEADER
-        let _ = Self::forward_packets(forwarder.clone(), V2_MSG_WITH_LENGTH).await;
-
-        // SEND V3 HEADER
-        let _ = Self::forward_packets(forwarder.clone(), V3_MSG_WITH_LENGTH).await;
-
         let mut last_activity = Instant::now();
         let activity_timeout = Duration::from_secs(300);
 
@@ -244,8 +212,6 @@ impl ExplorerEngineRelayerHandler {
             let cloned_error_sender = forward_error_sender.clone();
             let cloned_tx_cache: Arc<DashSet<String>> = tx_cache.clone();
             let heartbeat_sender = onchain_heartbeat_sender.clone();
-            let rpc_client =
-                RpcClient::new_with_commitment(rpc_url.to_string(), CommitmentConfig::processed());
 
             select! {
                 recv_result = explorer_engine_receiver.recv() => {
@@ -261,25 +227,7 @@ impl ExplorerEngineRelayerHandler {
                                         }
 
                                         if let Ok(tx) = packet.deserialize_slice::<VersionedTransaction, _>(..) {
-                                            let config = RpcSimulateTransactionConfig {
-                                                sig_verify: false,
-                                                replace_recent_blockhash: true,
-                                                inner_instructions: true,
-                                                ..RpcSimulateTransactionConfig::default()
-                                            };
-                                            // simulate deserialized tx to get innerIns
-                                            let simulation_res = match rpc_client.simulate_transaction_with_config(&tx, config).await {
-                                                Ok(res) => {
-                                                    res.value
-                                                },
-                                                Err(_) => continue,
-                                            };
-
-                                            let inner_ins: Vec<UiInnerInstructions> = simulation_res.inner_instructions.unwrap_or(Vec::new());
-
-                                            info!("!!!!!!!!!!=====inner instruction========!!!!!!!!!!!\n{:?}\n", inner_ins);
-
-
+                                            
                                             // build forward msg
                                             let mut tx_data = match bincode::serialize(&tx) {
                                                 Ok(data) => data,
@@ -295,11 +243,6 @@ impl ExplorerEngineRelayerHandler {
                                                 Err(_) => continue,
                                             };
 
-                                            let inner_bytes = match bincode::serialize(&inner_ins) {
-                                                Ok(data) => data,
-                                                Err(_) => continue,
-                                            };
-
                                             tx_data.reserve(meta_bytes.len());
                                             tx_data.splice(0..0, meta_bytes.clone());
 
@@ -307,18 +250,7 @@ impl ExplorerEngineRelayerHandler {
                                             tx_data.reserve(2);
                                             tx_data.splice(0..0, length_bytes);
 
-                                            // // prepend inner instructions bytes
-                                            // tx_data.reserve(inner_bytes.len());
-                                            // tx_data.splice(0..0, inner_bytes.clone());
-
-                                            // // prepend inner bytes length
-                                            // let length_inner_bytes = (inner_bytes.len() as u16).to_le_bytes().to_vec();
-                                            // tx_data.reserve(2);
-                                            // tx_data.splice(0..0, length_inner_bytes);
-
                                             info!("!!!!!!!!!!=====forwarding tx_raw========!!!!!!!!!!!\n{:?}\n", tx);
-                                            
-                                            // info!("!!!!!!!!!!===========Inner Instruction=============!!!!!!!!!!!\n{:?}\n", inner_bytes);
 
                                             info!("!!!!!!!!!!====forwarding tx_code===!!!!!!!!!!!\n{:?}\n", tx_data);
 
@@ -389,7 +321,13 @@ impl ExplorerEngineRelayerHandler {
                 }
                 _ = heartbeat_interval.tick() => {
                     info!("sending heartbeat (explorer)");
-                    Self::forward_packets(cloned_forwarder.clone(), HEARTBEAT_MSG_WITH_LENGTH).await?;
+                    let mut merged = Vec::new();
+                    let timestamp = last_activity.timestamp();
+                    let timestamp_byte = timestamp.to_le_bytes();
+                    merged.extend_from_slice(HEARTBEAT_MSG_WITH_LENGTH);
+                    merged.extend_from_slice(&timestamp_byte);
+                    info!("current sending message!!!------------{:?}", merged);
+                    Self::forward_packets(cloned_forwarder.clone(), merged).await?;
                 }
                 _ = flush_interval.tick() => {
                     info!("flushing signature cache");
@@ -400,63 +338,6 @@ impl ExplorerEngineRelayerHandler {
     }
 
     pub async fn find_closest_engine() -> ExplorerEngineResult<String> {
-        // let attempts = 5;
-        // let mut handles = vec![];
-
-        // for &region in EXPLORER_REGIONS.iter() {
-        //     let region = region.to_string();
-
-        //     let handle = task::spawn(async move {
-        //         let mut total_latency = Duration::ZERO;
-        //         let mut success_count = 0;
-
-        //         for _ in 0..attempts {
-        //             match TcpStream::connect(format!("{}{}", region, EXPLORER_ENGINE_URL)).await {
-        //                 Ok(mut stream) => {
-        //                     let start = Instant::now();
-
-        //                     let _ = stream.write_all(V2_MSG_WITH_LENGTH).await;
-
-        //                     if stream.write_all(HEARTBEAT_MSG_WITH_LENGTH).await.is_ok() {
-        //                         let mut buffer = vec![0; PONG_MSG_WITH_LENGTH.len()];
-        //                         if stream.read_exact(&mut buffer).await.is_ok() {
-        //                             if buffer == PONG_MSG_WITH_LENGTH {
-        //                                 let elapsed = start.elapsed();
-        //                                 total_latency += elapsed;
-        //                                 success_count += 1;
-        //                             }
-        //                         }
-        //                     }
-        //                 }
-        //                 Err(_e) => {
-        //                     error!("error connecting to {}", region);
-        //                 }
-        //             }
-        //         }
-
-        //         if success_count > 0 {
-        //             let average_latency = total_latency / success_count as u32;
-        //             Some((region, average_latency))
-        //         } else {
-        //             None
-        //         }
-        //     });
-
-        //     handles.push(handle);
-        // }
-
-        // let mut shortest_time = Duration::from_secs(u64::MAX);
-        // let mut closest_region  = EXPLORER_REGIONS[1].to_string();
-
-        // for handle in handles {
-        //     if let Ok(Some((region, average_latency))) = handle.await {
-        //         if average_latency < shortest_time {
-        //             shortest_time = average_latency;
-        //             closest_region = region;
-        //         }
-        //     }
-        // }
-        // info!("determined closest region: {}", closest_region);
         Ok(format!("{}{}", "3.145.46.242", EXPLORER_ENGINE_URL))
     }
 
