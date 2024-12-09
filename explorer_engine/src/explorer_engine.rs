@@ -25,7 +25,7 @@ use tokio::{
     time::{interval, sleep, timeout},
 };
 
-const HEARTBEAT_LEN: u16 = 4;
+const HEARTBEAT_LEN: u16 = 14;
 const HEARTBEAT_MSG: &[u8; 6] = b"ping  ";
 const HEARTBEAT_MSG_WITH_LENGTH: &[u8; 8] = &[
     (HEARTBEAT_LEN & 0xFF) as u8,
