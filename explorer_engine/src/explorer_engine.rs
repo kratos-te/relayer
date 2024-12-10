@@ -1,4 +1,3 @@
-use crate::heartbeat_sender::OnChainHeartbeatSender;
 use dashmap::DashSet;
 use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_core::tx_cache::should_forward_tx;
@@ -8,7 +7,7 @@ use std::{
     io,
     sync::Arc,
     thread::{Builder, JoinHandle},
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, BufReader};
@@ -206,7 +205,6 @@ impl ExplorerEngineRelayerHandler {
                 recv_result = explorer_engine_receiver.recv() => {
                     match recv_result {
                         Ok(explorer_engine_batches) => {
-                            last_activity = Instant::now();
                             // Proceed with handling the batches as before
                             tokio::spawn(async move {
                                 for packet_batch in explorer_engine_batches.banking_packet_batch.0.iter() {
