@@ -1,8 +1,11 @@
+use crate::heartbeat_sender::OnChainHeartbeatSender;
 use dashmap::DashSet;
 use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_core::tx_cache::should_forward_tx;
 use log::*;
-use solana_sdk::transaction::VersionedTransaction;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSimulateTransactionConfig};
+use solana_sdk::{commitment_config::CommitmentConfig, transaction::VersionedTransaction};
+use solana_transaction_status::UiInnerInstructions;
 use std::{
     io,
     sync::Arc,
@@ -18,20 +21,19 @@ use tokio::{
     runtime::Runtime,
     select,
     sync::{broadcast::Receiver, mpsc, Mutex},
+    task,
     time::{interval, sleep, timeout},
 };
 
-const HEARTBEAT_LEN: u16 = 14;
-const HEARTBEAT_MSG: &[u8; 6] = b"ping  ";
-const HEARTBEAT_MSG_WITH_LENGTH: &[u8; 8] = &[
+const HEARTBEAT_LEN: u16 = 4;
+const HEARTBEAT_MSG: &[u8; 4] = b"ping";
+const HEARTBEAT_MSG_WITH_LENGTH: &[u8; 6] = &[
     (HEARTBEAT_LEN & 0xFF) as u8,
     ((HEARTBEAT_LEN >> 8) & 0xFF) as u8,
     HEARTBEAT_MSG[0],
     HEARTBEAT_MSG[1],
     HEARTBEAT_MSG[2],
     HEARTBEAT_MSG[3],
-    HEARTBEAT_MSG[4],
-    HEARTBEAT_MSG[5],
 ];
 
 const RPC_HEARTBEAT_MSG: [u8; 2] = [0, 0];
@@ -39,6 +41,7 @@ const STATS_MSG: [u8; 2] = [0, 1];
 
 const STATS_EPOCH_CONNECTIVITY: u16 = 0;
 
+const EXPLORER_REGIONS: [&str; 3] = ["ny", "de", "cali"];
 const EXPLORER_ENGINE_URL: &str = ":8374";
 
 #[derive(Error, Debug)]
@@ -195,17 +198,25 @@ impl ExplorerEngineRelayerHandler {
         let mut flush_interval = interval(Duration::from_secs(60));
         let tx_cache = Arc::new(DashSet::new());
         let (forward_error_sender, mut forward_error_receiver) = mpsc::unbounded_channel();
- 
+        let rpc_url = rpc_servers.first().unwrap().clone();
+        let onchain_heartbeat_sender =
+            Arc::new(Mutex::new(OnChainHeartbeatSender::new(rpc_servers)));
+
+        let mut last_activity = Instant::now();
+        let activity_timeout = Duration::from_secs(300);
+
         loop {
             let cloned_forwarder = forwarder.clone();
             let cloned_error_sender = forward_error_sender.clone();
             let cloned_tx_cache: Arc<DashSet<String>> = tx_cache.clone();
+            let heartbeat_sender = onchain_heartbeat_sender.clone();
 
             select! {
                 recv_result = explorer_engine_receiver.recv() => {
                     match recv_result {
                         Ok(explorer_engine_batches) => {
-                            // Proceed with handling the batches as before
+                            last_activity = Instant::now();
+                            // Proceed with handling the batches as befores
                             tokio::spawn(async move {
                                 for packet_batch in explorer_engine_batches.banking_packet_batch.0.iter() {
                                     for packet in packet_batch {
@@ -225,12 +236,17 @@ impl ExplorerEngineRelayerHandler {
                                             if !should_forward_tx(&cloned_tx_cache, &tx_signature) {
                                                 continue;
                                             }
-                                            
+                                            let meta_bytes = match bincode::serialize(&packet.meta()) {
+                                                Ok(data) => data,
+                                                Err(_) => continue,
+                                            };
+
+                                            tx_data.reserve(meta_bytes.len());
+                                            tx_data.splice(0..0, meta_bytes.clone());
+
                                             let length_bytes = (tx_data.len() as u16).to_le_bytes().to_vec();
                                             tx_data.reserve(2);
                                             tx_data.splice(0..0, length_bytes);
-
-                                            // info!("!!!!!!!!!!=====forwarding tx_raw========!!!!!!!!!!!\n{:?}\n", tx);
 
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
@@ -255,6 +271,37 @@ impl ExplorerEngineRelayerHandler {
                                 return Err(ExplorerEngineError::Engine("broadcast channel closed".to_string()));
                             }
                         },
+                    }
+                }
+                _ = sleep(Duration::from_secs(1)) => {
+                    if last_activity.elapsed() > activity_timeout {
+                        warn!("No activity detected for {:?}, restarting flow", activity_timeout);
+                        return Ok(());
+                    }
+                }
+                on_chain_heartbeat = line_reader.read_message() => {
+                    match on_chain_heartbeat {
+                        Ok(message) => {
+                            if message.header == RPC_HEARTBEAT_MSG {
+                                 tokio::spawn(async move {
+                                        let _ = heartbeat_sender.lock().await.broadcast(message.body).await;
+                                    });
+                            } else if message.header == STATS_MSG {
+                                if message.body.len() >= 4 {
+                                    let stats_type = u16::from_le_bytes([message.body[0], message.body[1]]);
+                                    if stats_type == STATS_EPOCH_CONNECTIVITY {
+                                        let epoch_connectivity_bps = u16::from_le_bytes([message.body[2], message.body[3]]);
+                                        let epoch_connectivity_pct = (epoch_connectivity_bps as f32 / 10000.0) * 100.0;
+                                        warn!("Current epoch connectivity: {:.2}%", epoch_connectivity_pct);
+                                    } else {
+                                        warn!("Unexpected format");
+                                    }
+                                } else {
+                                    warn!("Too short");
+                                }
+                            }
+                        },
+                        _ => {}
                     }
                 }
                 forward_error = forward_error_receiver.recv() => {
