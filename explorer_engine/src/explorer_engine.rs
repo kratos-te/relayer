@@ -3,9 +3,7 @@ use dashmap::DashSet;
 use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_core::tx_cache::should_forward_tx;
 use log::*;
-use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSimulateTransactionConfig};
-use solana_sdk::{commitment_config::CommitmentConfig, transaction::VersionedTransaction};
-use solana_transaction_status::UiInnerInstructions;
+use solana_sdk::transaction::VersionedTransaction;
 use std::{
     io,
     sync::Arc,
@@ -21,7 +19,6 @@ use tokio::{
     runtime::Runtime,
     select,
     sync::{broadcast::Receiver, mpsc, Mutex},
-    task,
     time::{interval, sleep, timeout},
 };
 
@@ -43,7 +40,6 @@ const STATS_MSG: [u8; 2] = [0, 1];
 
 const STATS_EPOCH_CONNECTIVITY: u16 = 0;
 
-const EXPLORER_REGIONS: [&str; 3] = ["ny", "de", "cali"];
 const EXPLORER_ENGINE_URL: &str = ":8374";
 
 #[derive(Error, Debug)]
@@ -200,7 +196,6 @@ impl ExplorerEngineRelayerHandler {
         let mut flush_interval = interval(Duration::from_secs(60));
         let tx_cache = Arc::new(DashSet::new());
         let (forward_error_sender, mut forward_error_receiver) = mpsc::unbounded_channel();
-        let rpc_url = rpc_servers.first().unwrap().clone();
         let onchain_heartbeat_sender =
             Arc::new(Mutex::new(OnChainHeartbeatSender::new(rpc_servers)));
 
