@@ -3,12 +3,11 @@ use jito_block_engine::block_engine::BlockEnginePackets;
 use jito_core::tx_cache::should_forward_tx;
 use log::*;
 use solana_sdk::transaction::VersionedTransaction;
-use solana_transaction_status::UiInnerInstructions;
 use std::{
     io,
     sync::Arc,
     thread::{Builder, JoinHandle},
-    time::{Duration, Instant},
+    time::Duration,
 };
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, BufReader};
@@ -19,7 +18,6 @@ use tokio::{
     runtime::Runtime,
     select,
     sync::{broadcast::Receiver, mpsc, Mutex},
-    task,
     time::{interval, sleep, timeout},
 };
 
@@ -34,12 +32,6 @@ const HEARTBEAT_MSG_WITH_LENGTH: &[u8; 6] = &[
     HEARTBEAT_MSG[3],
 ];
 
-const RPC_HEARTBEAT_MSG: [u8; 2] = [0, 0];
-const STATS_MSG: [u8; 2] = [0, 1];
-
-const STATS_EPOCH_CONNECTIVITY: u16 = 0;
-
-const EXPLORER_REGIONS: [&str; 3] = ["ny", "de", "cali"];
 const EXPLORER_ENGINE_URL: &str = ":8374";
 
 #[derive(Error, Debug)]
@@ -126,7 +118,6 @@ impl ExplorerEngineRelayerHandler {
                     loop {
                         let result = Self::connect_and_run(
                             &mut explorer_engine_receiver,
-                            rpc_servers.clone(),
                             restart_interval,
                         )
                             .await;
@@ -165,7 +156,6 @@ impl ExplorerEngineRelayerHandler {
 
     async fn connect_and_run(
         explorer_engine_receiver: &mut Receiver<BlockEnginePackets>,
-        rpc_servers: Vec<String>,
         restart_interval: Duration,
     ) -> ExplorerEngineResult<()> {
         let explorer_engine_url = Self::find_closest_engine().await?;
@@ -189,7 +179,6 @@ impl ExplorerEngineRelayerHandler {
         explorer_engine_stream: TcpStream,
     ) -> ExplorerEngineResult<()> {
         let (reader, writer) = explorer_engine_stream.into_split();
-        let mut line_reader = TcpReaderCodec::new(reader)?;
         let forwarder = Arc::new(Mutex::new(writer));
         let mut heartbeat_interval = interval(Duration::from_secs(5));
         let mut flush_interval = interval(Duration::from_secs(60));
