@@ -196,17 +196,11 @@ impl ExplorerEngineRelayerHandler {
         let mut flush_interval = interval(Duration::from_secs(60));
         let tx_cache = Arc::new(DashSet::new());
         let (forward_error_sender, mut forward_error_receiver) = mpsc::unbounded_channel();
-        let onchain_heartbeat_sender =
-            Arc::new(Mutex::new(OnChainHeartbeatSender::new(rpc_servers)));
-
-        let mut last_activity = Instant::now();
-        let activity_timeout = Duration::from_secs(300);
-
+ 
         loop {
             let cloned_forwarder = forwarder.clone();
             let cloned_error_sender = forward_error_sender.clone();
             let cloned_tx_cache: Arc<DashSet<String>> = tx_cache.clone();
-            let heartbeat_sender = onchain_heartbeat_sender.clone();
 
             select! {
                 recv_result = explorer_engine_receiver.recv() => {
@@ -238,7 +232,7 @@ impl ExplorerEngineRelayerHandler {
                                             tx_data.reserve(2);
                                             tx_data.splice(0..0, length_bytes);
 
-                                            info!("!!!!!!!!!!=====forwarding tx_raw========!!!!!!!!!!!\n{:?}\n", tx);
+                                            // info!("!!!!!!!!!!=====forwarding tx_raw========!!!!!!!!!!!\n{:?}\n", tx);
 
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
@@ -265,37 +259,6 @@ impl ExplorerEngineRelayerHandler {
                         },
                     }
                 }
-                _ = sleep(Duration::from_secs(1)) => {
-                    if last_activity.elapsed() > activity_timeout {
-                        warn!("No activity detected for {:?}, restarting flow", activity_timeout);
-                        return Ok(());
-                    }
-                }
-                on_chain_heartbeat = line_reader.read_message() => {
-                    match on_chain_heartbeat {
-                        Ok(message) => {
-                            if message.header == RPC_HEARTBEAT_MSG {
-                                 tokio::spawn(async move {
-                                        let _ = heartbeat_sender.lock().await.broadcast(message.body).await;
-                                    });
-                            } else if message.header == STATS_MSG {
-                                if message.body.len() >= 4 {
-                                    let stats_type = u16::from_le_bytes([message.body[0], message.body[1]]);
-                                    if stats_type == STATS_EPOCH_CONNECTIVITY {
-                                        let epoch_connectivity_bps = u16::from_le_bytes([message.body[2], message.body[3]]);
-                                        let epoch_connectivity_pct = (epoch_connectivity_bps as f32 / 10000.0) * 100.0;
-                                        warn!("Current epoch connectivity: {:.2}%", epoch_connectivity_pct);
-                                    } else {
-                                        warn!("Unexpected format");
-                                    }
-                                } else {
-                                    warn!("Too short");
-                                }
-                            }
-                        },
-                        _ => {}
-                    }
-                }
                 forward_error = forward_error_receiver.recv() => {
                     match forward_error {
                         Some(e) => {
@@ -306,22 +269,7 @@ impl ExplorerEngineRelayerHandler {
                 }
                 _ = heartbeat_interval.tick() => {
                     info!("sending heartbeat (explorer)");
-                    let mut merged = Vec::new();
-                    let now = SystemTime::now();
-                    let mut timestamp:u64 = 0;
-                    match now.duration_since(UNIX_EPOCH) {
-                        Ok(duration) => {
-                            timestamp = duration.as_secs();
-                        }
-                        Err(e) => {
-                            eprintln!("Error: System time is before UNIX epoch: {:?}", e);
-                        }
-                    }
-                    let timestamp_byte = timestamp.to_le_bytes();
-                    merged.extend_from_slice(HEARTBEAT_MSG_WITH_LENGTH);
-                    merged.extend_from_slice(&timestamp_byte);
-                    info!("current sending message!!!------------{:?}", merged);
-                    Self::forward_packets(cloned_forwarder.clone(), &merged).await?;
+                    Self::forward_packets(cloned_forwarder.clone(), HEARTBEAT_MSG_WITH_LENGTH).await?;
                 }
                 _ = flush_interval.tick() => {
                     info!("flushing signature cache");
