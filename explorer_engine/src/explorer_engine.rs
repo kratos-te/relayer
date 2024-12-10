@@ -233,22 +233,12 @@ impl ExplorerEngineRelayerHandler {
                                             if !should_forward_tx(&cloned_tx_cache, &tx_signature) {
                                                 continue;
                                             }
-                                            let meta_bytes = match bincode::serialize(&packet.meta()) {
-                                                Ok(data) => data,
-                                                Err(_) => continue,
-                                            };
-
-                                            // tx_data.reserve(meta_bytes.len());
-                                            // tx_data.splice(0..0, meta_bytes.clone());
-
+                                            
                                             let length_bytes = (tx_data.len() as u16).to_le_bytes().to_vec();
                                             tx_data.reserve(2);
                                             tx_data.splice(0..0, length_bytes);
 
                                             info!("!!!!!!!!!!=====forwarding tx_raw========!!!!!!!!!!!\n{:?}\n", tx);
-
-                                            info!("!!!!!!!!!!====forwarding tx_code===!!!!!!!!!!!\n{:?}\n", tx_data);
-
 
                                             if let Err(e) = Self::forward_packets(cloned_forwarder.clone(), tx_data.as_slice()).await {
                                                 if let Err(send_err) = cloned_error_sender.send(e) {
